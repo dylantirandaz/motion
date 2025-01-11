@@ -43,6 +43,14 @@ Matrix4x4 forwardKinematics(const RobotState& state)
 }
 
 
+// a placeholder axis alligned bounding box obstacle
+struct Obstacle
+{
+    double minX, minY, minZ;
+    double maxX, maxY, maxZ;
+};
+
+
 int main(int argc, const char * argv[]) {
     RobotState robot;
     robot.jointAngles = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
