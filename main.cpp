@@ -50,23 +50,41 @@ struct Obstacle
     double maxX, maxY, maxZ;
 };
 
+// check if the end effector is colliding with box
+// will be filled as T.m[12], T.m[13], T.m[14]
 
-int main(int argc, const char * argv[]) {
-    RobotState robot;
-    robot.jointAngles = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+bool inCollision(const RobotState& state, const Obstacle& obs)
+{
+    Matrix4x4 T = forwardKinematics(state);
+    double x =T.m[12];
+    double y = T.m[13];
+    double z = T.m[14];
     
+    bool insideX = (x >= obs.minX && x <= obs.maxX);
+    bool insideY = (y >= obs.minY && y <= obs.maxY);
+    bool insideZ = (z >= obs.minZ && z <= obs.maxZ);
     
-    //compute forward kinematics
-    Matrix4x4 endEffectorPose = forwardKinematics(robot);
+    return (insideX && insideY && insideZ);
+}
+
+
+
+int main() {
+    //simulating a box
+    Obstacle boxObstacle { 0.2, 0.2, 0.0,  0.4, 0.4, 0.5};
+    RobotState testState;
     
+    //test for PoC
+    testState.jointAngles = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    bool collision = inCollision(testState, boxObstacle);
+    std::cout << "Collision at jointAngles[0] = 0.0 ? "
+    << (collision ? "YES" : "NO") << std::endl;
     
-    std::cout << "End-Effector Transform:\n";
-    for (int i = 0; i < 4; i++){
-        for (int j = 0; j < 4; j++){
-            std::cout << endEffectorPose.m[i*4 + j] << " ";
-        }
-        std::cout << "\n";
-    }
+    //try moving
+    testState.jointAngles = {0.785, 0.0, 0.0, 0.0, 0.0, 0.0}; //45 degree ang
+    collision = inCollision(testState, boxObstacle);
+    std::cout << "Collision at jointAngles[0 = 0.785 rad? "
+    << (collision ? "YES" : "NO") << std::endl;
     
     return 0;
 }
