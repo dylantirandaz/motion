@@ -34,10 +34,28 @@ struct Matrix4x4
 
 Matrix4x4 identityMatrix()
 {
-    Matrix4x4 I;
+    Matrix4x4 I{};
     for(int i = 0; i < 16; i++)
         I.m[i] = (i % 5 == 0) ? 1.0 : 0.0;
     return I;
+}
+
+Matrix4x4 multiply(const Matrix4x4& A, const Matrix4x4& B)
+{
+    Matrix4x4 R{};
+    for(int row = 0; row < 4; row++)
+    {
+        for(int col = 0; col < 4; col++)
+        {
+            double sum = 0.0;
+            for(int k = 0; k < 4; k++)
+            {
+                sum += A.m[row*4 + k] * B.m[k*4 + col];
+            }
+            R.m[row*4 + col] = sum;
+        }
+    }
+    return R;
 }
 
 // placeholding forward kinematics
