@@ -8,15 +8,29 @@
 
 using JointAngles = std::array<double, 6>;
 
-struct RobotState
+struct DHParameters
 {
-    JointAngles jointAngles;
+    double alpha;  
+    double a;      
+    double d;     
+    double thetaOffset; 
 };
+
+static const std::array<DHParameters, 6> MY_ROBOT_DH = {{
+    // alpha,   a,     d,    thetaOffset
+    {  M_PI_2,  0.0,   0.3,  0.0 },  
+    {  0.0,     0.3,   0.0,  0.0 },  
+    {  0.0,     0.3,   0.0,  0.0 },  
+    { -M_PI_2,  0.0,   0.2,  0.0 }, 
+    {  M_PI_2,  0.0,   0.0,  0.0 },  
+    {  0.0,     0.0,   0.1,  0.0 }   
+}};
 
 struct Matrix4x4
 {
     double m[16];
 };
+
 
 Matrix4x4 identityMatrix()
 {
