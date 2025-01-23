@@ -4,6 +4,7 @@
 #include <cmath>
 #include <random>
 #include <limits>
+#include <algorithm>
 
 using JointAngles = std::array<double, 6>;
 
@@ -25,15 +26,24 @@ Matrix4x4 identityMatrix()
     return I;
 }
 
-//placeholding forward kinematics
+// placeholding forward kinematics
 Matrix4x4 forwardKinematics(const RobotState& state)
 {
     Matrix4x4 T = identityMatrix();
-    double xOffset = 0.5 * std::cos(state.jointAngles[0]);
-    double yOffset = 0.5 * std::sin(state.jointAngles[0]);
+    
+    double xOffset = 0.3 * std::cos(state.jointAngles[0])
+                   + 0.2 * std::sin(state.jointAngles[1])
+                   + 0.1 * state.jointAngles[2];
+                   
+    double yOffset = 0.3 * std::sin(state.jointAngles[3])
+                   + 0.2 * std::cos(state.jointAngles[4]);
+                   
+    double zOffset = 0.3 + 0.1 * std::sin(state.jointAngles[5]);
+    
     T.m[12] = xOffset;
     T.m[13] = yOffset;
-    T.m[14] = 0.3;
+    T.m[14] = zOffset;
+    
     return T;
 }
 
@@ -57,25 +67,26 @@ bool inCollision(const RobotState& state, const Obstacle& obs)
     return (insideX && insideY && insideZ);
 }
 
-
-// Minimal 1D RRT for jointAngles[0] only
-
 struct Node
 {
     RobotState state;
-    int parent; // index of parent in tree
+    int parent;
 };
 
-double distance1D(const RobotState& a, const RobotState& b)
+double distance6D(const RobotState& a, const RobotState& b)
 {
-    // We only care about jointAngles[0]
-    return std::fabs(a.jointAngles[0] - b.jointAngles[0]);
+    double sum = 0.0;
+    for(int i = 0; i < 6; i++)
+    {
+        double diff = a.jointAngles[i] - b.jointAngles[i];
+        sum += diff * diff;
+    }
+    return std::sqrt(sum);
 }
 
 RobotState steer(const RobotState& from, const RobotState& to, double maxStep)
 {
-    // We only steer in jointAngles[0]
-    double dist = distance1D(from, to);
+    double dist = distance6D(from, to);
     if(dist < maxStep)
     {
         return to;
@@ -83,26 +94,29 @@ RobotState steer(const RobotState& from, const RobotState& to, double maxStep)
     else
     {
         RobotState newState = from;
-        double dir = (to.jointAngles[0] - from.jointAngles[0]) > 0 ? 1.0 : -1.0;
-        newState.jointAngles[0] += dir * maxStep;
+        for(int i = 0; i < 6; i++)
+        {
+            double diff = to.jointAngles[i] - from.jointAngles[i];
+            newState.jointAngles[i] += (diff / dist) * maxStep;
+        }
         return newState;
     }
 }
 
 int main()
 {
-    Obstacle boxObstacle { 0.2, 0.2, 0.0,   0.4, 0.4, 0.5 };
+    Obstacle boxObstacle { 0.2, 0.2, 0.0,   0.5, 0.5, 0.6 };
     
     RobotState start;
-    start.jointAngles = {0.0, 0, 0, 0, 0, 0};
+    start.jointAngles = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
     
     RobotState goal;
-    goal.jointAngles = {1.57, 0, 0, 0, 0, 0}; // ~90 degrees in rad
+    //picke something random-ish
+    goal.jointAngles = {1.0, 1.2, -0.5, 0.8, -1.0, 0.5};
     
-    // RRT Parameters
-    const int maxIterations = 1000;
+    const int maxIterations = 2000;
     const double maxStep = 0.05;
-    const double goalThreshold = 0.05;
+    const double goalThreshold = 0.2; // allow some margin in 6D
     
     std::vector<Node> rrt;
     
@@ -111,50 +125,48 @@ int main()
     root.parent = -1;
     rrt.push_back(root);
     
-    // Random engine for sampling
     std::random_device rd;
     std::mt19937 gen(rd());
-    std::uniform_real_distribution<double> distSampler(-3.14, 3.14); // random angle range
+    std::uniform_real_distribution<double> distSampler(-3.14, 3.14); 
     
     bool reachedGoal = false;
     int goalNodeIndex = -1;
     
     for(int iter = 0; iter < maxIterations; iter++)
     {
-        // sampling a random state
         RobotState randState;
-        randState.jointAngles = { distSampler(gen), 0, 0, 0, 0, 0 };
+        for(int i = 0; i < 6; i++)
+        {
+            randState.jointAngles[i] = distSampler(gen);
+        }
         
-        // find nearest node in RRT
         double bestDist = std::numeric_limits<double>::max();
-        int nearestIndex = 0;
+        int nearestIdx = 0;
         for(int i = 0; i < (int)rrt.size(); i++)
         {
-            double d = distance1D(rrt[i].state, randState);
+            double d = distance6D(rrt[i].state, randState);
             if(d < bestDist)
             {
                 bestDist = d;
-                nearestIndex = i;
+                nearestIdx = i;
             }
         }
-        // steer it
-        RobotState newState = steer(rrt[nearestIndex].state, randState, maxStep);
         
-        // check collision
+        RobotState newState = steer(rrt[nearestIdx].state, randState, maxStep);
+        
         if(!inCollision(newState, boxObstacle))
         {
-            
             Node newNode;
             newNode.state = newState;
-            newNode.parent = nearestIndex;
+            newNode.parent = nearestIdx;
             rrt.push_back(newNode);
             
-            double dGoal = distance1D(newState, goal);
+            double dGoal = distance6D(newState, goal);
             if(dGoal < goalThreshold)
             {
                 std::cout << "Reached goal at iteration " << iter << "\n";
                 reachedGoal = true;
-                goalNodeIndex = (int)rrt.size()-1;
+                goalNodeIndex = (int)rrt.size() - 1;
                 break;
             }
         }
@@ -162,7 +174,6 @@ int main()
     
     if(reachedGoal)
     {
-        // reconstruct path
         std::vector<RobotState> path;
         int current = goalNodeIndex;
         while(current != -1)
@@ -170,13 +181,17 @@ int main()
             path.push_back(rrt[current].state);
             current = rrt[current].parent;
         }
-        // path is in reverse (goal -> start), so reverse it
         std::reverse(path.begin(), path.end());
         
-        std::cout << "Path found with " << path.size() << " states:\n";
+        std::cout << "Path found with " << path.size() << " states.\n";
         for(const auto& st : path)
         {
-            std::cout << "  jointAngles[0] = " << st.jointAngles[0] << "\n";
+            std::cout << "  [ ";
+            for(int i = 0; i < 6; i++)
+            {
+                std::cout << st.jointAngles[i] << (i<5?", ":" ");
+            }
+            std::cout << "]\n";
         }
     }
     else
@@ -186,4 +201,3 @@ int main()
     
     return 0;
 }
-
