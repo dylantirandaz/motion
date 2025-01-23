@@ -58,6 +58,25 @@ Matrix4x4 multiply(const Matrix4x4& A, const Matrix4x4& B)
     return R;
 }
 
+Matrix4x4 dhTransform(const DHParameters& dh, double jointAngle)
+{
+    Matrix4x4 T = identityMatrix();
+    
+    double theta = dh.thetaOffset + jointAngle;
+    double ca = std::cos(dh.alpha);
+    double sa = std::sin(dh.alpha);
+    double ct = std::cos(theta);
+    double st = std::sin(theta);
+
+    T.m[0]  = ct;              T.m[1]  = -st * ca;          T.m[2]  =  st * sa;          T.m[3]  = dh.a * ct;
+    T.m[4]  = st;              T.m[5]  =  ct * ca;          T.m[6]  = -ct * sa;          T.m[7]  = dh.a * st;
+    T.m[8]  = 0.0;             T.m[9]  =  sa;               T.m[10] =  ca;               T.m[11] = dh.d;
+    T.m[12] = 0.0;             T.m[13] =  0.0;              T.m[14] =  0.0;              T.m[15] = 1.0;
+    
+    return T;
+}
+
+
 // placeholding forward kinematics
 Matrix4x4 forwardKinematics(const RobotState& state)
 {
