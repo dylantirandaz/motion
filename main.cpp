@@ -77,25 +77,18 @@ Matrix4x4 dhTransform(const DHParameters& dh, double jointAngle)
 }
 
 
-// placeholding forward kinematics
-Matrix4x4 forwardKinematics(const RobotState& state)
+std::vector<Matrix4x4> forwardKinematics(const JointAngles& angles)
 {
-    Matrix4x4 T = identityMatrix();
+    std::vector<Matrix4x4> transforms(6);
+    Matrix4x4 current = identityMatrix();
     
-    double xOffset = 0.3 * std::cos(state.jointAngles[0])
-                   + 0.2 * std::sin(state.jointAngles[1])
-                   + 0.1 * state.jointAngles[2];
-                   
-    double yOffset = 0.3 * std::sin(state.jointAngles[3])
-                   + 0.2 * std::cos(state.jointAngles[4]);
-                   
-    double zOffset = 0.3 + 0.1 * std::sin(state.jointAngles[5]);
-    
-    T.m[12] = xOffset;
-    T.m[13] = yOffset;
-    T.m[14] = zOffset;
-    
-    return T;
+    for(int i = 0; i < 6; i++)
+    {
+        Matrix4x4 linkTf = dhTransform(MY_ROBOT_DH[i], angles[i]);
+        current = multiply(current, linkTf);  
+        transforms[i] = current;
+    }
+    return transforms;
 }
 
 struct Obstacle
